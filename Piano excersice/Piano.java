@@ -5,25 +5,36 @@ import javax.swing.*;
 import javax.swing.event.*;
 
 public class Piano implements ChangeListener, KeyListener {
-    private JButton[] w = new JButton[14]; // 2 octaves of white keys
-    private JButton[] b = new JButton[10]; // 2 octaves of black keys (minus breaks)
-    private Synthesizer synth;
-    private MidiChannel[] mChannels;
-    private JComboBox<String> instrumentList;
-    private int[] whiteNotes = {60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79, 81, 83}; // White key notes for 2 octaves
-    private int[] blackNotes = {61, 63, 66, 68, 70, 73, 75, 78, 80, 82}; // Black key notes for 2 octaves
-    private Color defaultWhiteKeyColor = Color.WHITE;
-    private Color defaultBlackKeyColor = Color.BLACK;
+    private static final int NUM_WHITE_KEYS = 14;
+    private static final int NUM_BLACK_KEYS = 10;
+    private static final int WHITE_KEY_WIDTH = 75;
+    private static final int WHITE_KEY_HEIGHT = 300;
+    private static final int BLACK_KEY_WIDTH = 50;
+    private static final int BLACK_KEY_HEIGHT = 180;
+    private static final Color DEFAULT_WHITE_KEY_COLOR = Color.WHITE;
+    private static final Color DEFAULT_BLACK_KEY_COLOR = Color.BLACK;
+    private static final Color PRESSED_KEY_COLOR = Color.YELLOW;
 
-    Piano() {
+    private JButton[] whiteKeys = new JButton[NUM_WHITE_KEYS];
+    private JButton[] blackKeys = new JButton[NUM_BLACK_KEYS];
+    private Synthesizer synthesizer;
+    private MidiChannel[] midiChannels;
+    private JComboBox<String> instrumentList;
+
+    private static final int[] WHITE_NOTES = {60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79, 81, 83}; // White key notes for 2 octaves
+    private static final int[] BLACK_NOTES = {61, 63, 66, 68, 70, 73, 75, 78, 80, 82}; // Black key notes for 2 octaves
+
+    private static final String[] INSTRUMENTS = {"Piano", "Guitar", "Trumpet", "Violin", "Flute", "Saxophone"};
+    private static final int[] INSTRUMENT_PROGRAMS = {0, 24, 56, 40, 73, 65}; // Program numbers for instruments
+
+    public Piano() {
         JFrame frame = new JFrame("MIDI Piano");
 
         // Instrument selector
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JLabel selectLabel = new JLabel("Select Instrument:");
         selectLabel.setFont(new Font("Arial", Font.BOLD, 14));
-        String[] instruments = {"Piano", "Guitar", "Trumpet", "Violin"};
-        instrumentList = new JComboBox<>(instruments);
+        instrumentList = new JComboBox<>(INSTRUMENTS);
         instrumentList.setFont(new Font("Arial", Font.PLAIN, 14));
         instrumentList.addActionListener(e -> changeInstrument(instrumentList.getSelectedIndex()));
         topPanel.add(selectLabel);
@@ -33,37 +44,8 @@ public class Piano implements ChangeListener, KeyListener {
         JLayeredPane panel = new JLayeredPane();
         frame.add(panel, BorderLayout.CENTER);
 
-        // White keys
-        for (int i = 0; i < 14; i++) {
-            w[i] = new JButton();
-            w[i].setBackground(defaultWhiteKeyColor);
-            w[i].setName(String.valueOf(whiteNotes[i]));
-            w[i].setLocation(i * 75, 0);
-            w[i].setSize(75, 300);
-            w[i].setBorder(BorderFactory.createLineBorder(Color.BLACK));
-            w[i].addChangeListener(this);
-            panel.add(w[i], JLayeredPane.DEFAULT_LAYER);
-
-            // Add note labels to white keys
-            JLabel label = new JLabel(getNoteLabel(i), SwingConstants.CENTER);
-            label.setBounds(i * 75, 270, 75, 30);
-            label.setFont(new Font("Arial", Font.BOLD, 14));
-            panel.add(label, JLayeredPane.PALETTE_LAYER);
-        }
-
-        // Black keys
-        for (int i = 0, blackKeyPos = 0; i < 14; i++) {
-            if (i % 7 == 2 || i % 7 == 6) continue; // Skip positions without black keys
-            b[blackKeyPos] = new JButton();
-            b[blackKeyPos].setBackground(defaultBlackKeyColor);
-            b[blackKeyPos].setName(String.valueOf(blackNotes[blackKeyPos]));
-            b[blackKeyPos].setLocation(55 + i * 75, 0);
-            b[blackKeyPos].setSize(50, 180);
-            b[blackKeyPos].setBorder(BorderFactory.createLineBorder(Color.BLACK));
-            b[blackKeyPos].addChangeListener(this);
-            panel.add(b[blackKeyPos], JLayeredPane.PALETTE_LAYER);
-            blackKeyPos++;
-        }
+        initializeWhiteKeys(panel);
+        initializeBlackKeys(panel);
 
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(1100, 400);
@@ -72,51 +54,79 @@ public class Piano implements ChangeListener, KeyListener {
         frame.addKeyListener(this);
         frame.setVisible(true);
 
-        // Initialize MIDI
-        try {
-            synth = MidiSystem.getSynthesizer();
-            synth.open();
-            mChannels = synth.getChannels();
-        } catch (MidiUnavailableException e) {
-            JOptionPane.showMessageDialog(null, "Unable to open MIDI.");
-        }
-
+        initializeMIDI();
         changeInstrument(0); // Set default instrument to Piano
     }
 
+    private void initializeWhiteKeys(JLayeredPane panel) {
+        for (int i = 0; i < NUM_WHITE_KEYS; i++) {
+            whiteKeys[i] = new JButton();
+            whiteKeys[i].setBackground(DEFAULT_WHITE_KEY_COLOR);
+            whiteKeys[i].setName(String.valueOf(WHITE_NOTES[i]));
+            whiteKeys[i].setLocation(i * WHITE_KEY_WIDTH, 0);
+            whiteKeys[i].setSize(WHITE_KEY_WIDTH, WHITE_KEY_HEIGHT);
+            whiteKeys[i].setBorder(BorderFactory.createLineBorder(Color.BLACK));
+            whiteKeys[i].addChangeListener(this);
+            panel.add(whiteKeys[i], JLayeredPane.DEFAULT_LAYER);
+
+            JLabel label = new JLabel(getNoteLabel(i), SwingConstants.CENTER);
+            label.setBounds(i * WHITE_KEY_WIDTH, WHITE_KEY_HEIGHT - 30, WHITE_KEY_WIDTH, 30);
+            label.setFont(new Font("Arial", Font.BOLD, 14));
+            panel.add(label, JLayeredPane.PALETTE_LAYER);
+        }
+    }
+
+    private void initializeBlackKeys(JLayeredPane panel) {
+        for (int i = 0, pos = 0; i < NUM_WHITE_KEYS; i++) {
+            if (i % 7 == 2 || i % 7 == 6) continue; // Skip positions without black keys
+            blackKeys[pos] = new JButton();
+            blackKeys[pos].setBackground(DEFAULT_BLACK_KEY_COLOR);
+            blackKeys[pos].setName(String.valueOf(BLACK_NOTES[pos]));
+            blackKeys[pos].setLocation(55 + i * WHITE_KEY_WIDTH, 0);
+            blackKeys[pos].setSize(BLACK_KEY_WIDTH, BLACK_KEY_HEIGHT);
+            blackKeys[pos].setBorder(BorderFactory.createLineBorder(Color.BLACK));
+            blackKeys[pos].addChangeListener(this);
+            panel.add(blackKeys[pos], JLayeredPane.PALETTE_LAYER);
+            pos++;
+        }
+    }
+
+    private void initializeMIDI() {
+        try {
+            synthesizer = MidiSystem.getSynthesizer();
+            synthesizer.open();
+            midiChannels = synthesizer.getChannels();
+        } catch (MidiUnavailableException e) {
+            JOptionPane.showMessageDialog(null, "Unable to open MIDI.");
+        }
+    }
+
     private void changeInstrument(int instrumentIndex) {
-        int[] instruments = {0, 24, 56, 40}; // 0 = Acoustic Grand Piano, 24 = Acoustic Guitar (nylon), 56 = Trumpet, 40 = Violin
-        if (mChannels != null) {
-            mChannels[0].programChange(instruments[instrumentIndex]); // Change instrument based on the selected index
+        if (midiChannels != null) {
+            midiChannels[0].programChange(INSTRUMENT_PROGRAMS[instrumentIndex]);
         } else {
             System.err.println("MIDI channels are not initialized.");
         }
     }
 
-    // Handle button press/release using ChangeListener
     @Override
     public void stateChanged(ChangeEvent e) {
         JButton button = (JButton) e.getSource();
         int note = Integer.parseInt(button.getName());
 
-        if (mChannels != null) {
+        if (midiChannels != null) {
             if (button.getModel().isPressed()) {
-                mChannels[0].noteOn(note, 127); // Play note when pressed
-                button.setBackground(Color.YELLOW); // Highlight pressed key
+                midiChannels[0].noteOn(note, 127); // Play note when pressed
+                button.setBackground(PRESSED_KEY_COLOR); // Highlight pressed key
             } else {
-                mChannels[0].noteOff(note); // Stop note when released
-                if (isBlackKey(button)) {
-                    button.setBackground(defaultBlackKeyColor); // Restore black key color
-                } else {
-                    button.setBackground(defaultWhiteKeyColor); // Restore white key color
-                }
+                midiChannels[0].noteOff(note); // Stop note when released
+                button.setBackground(isBlackKey(button) ? DEFAULT_BLACK_KEY_COLOR : DEFAULT_WHITE_KEY_COLOR);
             }
         } else {
             System.err.println("MIDI channels are not initialized.");
         }
     }
 
-    // Key listener methods
     @Override
     public void keyPressed(KeyEvent e) {
         char key = e.getKeyChar();
@@ -134,50 +144,46 @@ public class Piano implements ChangeListener, KeyListener {
         // No action needed
     }
 
-    // Play or stop a note based on key press/release
     private void playNoteForKey(char key, boolean pressed) {
-        int note = -1;
-        switch (key) {
-            case 'a': note = whiteNotes[0]; break;
-            case 's': note = whiteNotes[1]; break;
-            case 'd': note = whiteNotes[2]; break;
-            case 'f': note = whiteNotes[3]; break;
-            case 'g': note = whiteNotes[4]; break;
-            case 'h': note = whiteNotes[5]; break;
-            case 'j': note = whiteNotes[6]; break;
-            case 'k': note = whiteNotes[7]; break;
-            case 'l': note = whiteNotes[8]; break;
-            case ';': note = whiteNotes[9]; break;
-            case '\'': note = whiteNotes[10]; break;
-            case 'q': note = blackNotes[0]; break;
-            case 'w': note = blackNotes[1]; break;
-            case 'e': note = blackNotes[2]; break;
-            case 'r': note = blackNotes[3]; break;
-            case 't': note = blackNotes[4]; break;
-        }
-
-        if (note != -1) {
-            if (mChannels != null) {
-                if (pressed) {
-                    mChannels[0].noteOn(note, 127);
-                } else {
-                    mChannels[0].noteOff(note);
-                }
+        int note = getNoteFromKey(key);
+        if (note != -1 && midiChannels != null) {
+            if (pressed) {
+                midiChannels[0].noteOn(note, 127);
             } else {
-                System.err.println("MIDI channels are not initialized.");
+                midiChannels[0].noteOff(note);
             }
         }
     }
 
-    // Helper method to check if the key is black
+    private int getNoteFromKey(char key) {
+        switch (key) {
+            case 'a': return WHITE_NOTES[0];
+            case 's': return WHITE_NOTES[1];
+            case 'd': return WHITE_NOTES[2];
+            case 'f': return WHITE_NOTES[3];
+            case 'g': return WHITE_NOTES[4];
+            case 'h': return WHITE_NOTES[5];
+            case 'j': return WHITE_NOTES[6];
+            case 'k': return WHITE_NOTES[7];
+            case 'l': return WHITE_NOTES[8];
+            case ';': return WHITE_NOTES[9];
+            case '\'': return WHITE_NOTES[10];
+            case 'q': return BLACK_NOTES[0];
+            case 'w': return BLACK_NOTES[1];
+            case 'e': return BLACK_NOTES[2];
+            case 'r': return BLACK_NOTES[3];
+            case 't': return BLACK_NOTES[4];
+            default: return -1;
+        }
+    }
+
     private boolean isBlackKey(JButton button) {
-        for (JButton blackKey : b) {
+        for (JButton blackKey : blackKeys) {
             if (blackKey == button) return true;
         }
         return false;
     }
 
-    // Helper method to label white keys with musical notes
     private String getNoteLabel(int index) {
         String[] noteLabels = {"C", "D", "E", "F", "G", "A", "B", "C", "D", "E", "F", "G", "A", "B"};
         return noteLabels[index];
