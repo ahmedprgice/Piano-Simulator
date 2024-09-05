@@ -1,0 +1,1 @@
+A simple virtual piano built using Java Swing and Java MIDI system. This project simulates a piano with two octaves of white and black keys. Users can play notes either by clicking the on-screen keys or using the keyboard. Additionally, you can select between different instruments such as piano, guitar, trumpet, and violin.
