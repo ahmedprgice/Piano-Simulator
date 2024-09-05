@@ -10,7 +10,8 @@ Acoustic Grand Piano
 Acoustic Guitar (nylon)
 Trumpet
 Violin
-
+Flute 
+Saxophone
 
 Running the Project
 Clone the repository:
@@ -20,5 +21,5 @@ Compile and run the program:
 javac Piano.java
 java Piano
 
-![image](https://github.com/user-attachments/assets/940a1961-c122-45fb-b098-c3614747b004)
 
+![image](https://github.com/user-attachments/assets/ce5767bd-bc20-46aa-b017-f68bfad9f344)
