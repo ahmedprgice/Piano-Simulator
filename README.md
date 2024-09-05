@@ -20,6 +20,7 @@ git clone https://github.com/yourusername/MIDI-Piano.git
 Compile and run the program:
 
 javac Piano.java
+
 java Piano
 
 
